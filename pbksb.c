@@ -9,6 +9,16 @@ typedef struct {
     int *c, n, p, pid;
 } GM;
 
+//n = size of array
+//p = number of processors/threads
+//a = U array from handout
+//b = b' vector from handout
+//pid = process id, ie what thread number
+//c = synchronization variable - update this to improve performance
+//a is double pointer because 2D array
+//start sets start of mem block, pid starts at 0
+//block is how many rows each thread operates on
+//j = n-1 is the last column
 void *
 pbksb(void *varg) {
     GM *arg = varg;
@@ -25,19 +35,39 @@ pbksb(void *varg) {
     block = n / p;
     start = block * pid;
     end = start + block - 1;
+    //remove this loop
     for(j = n - 1; j > end; j--)
         while(c[j] == 0);
     for(i = end; i >= start; i--) {
         sum = b[i];
         for(j = n - 1; j > i; j--)
+            //block here to see if bj is ready
             sum -= a[i][j] * b[j];
         b[i] = sum / a[i][i];
         c[i] = 1;
+        //signal here to wake up processes waiting on bj in loop above
     }
     return NULL;
 }
 
-int
+/*mutex lock and cv
+* eliminate for loop at beginning w/ busy waiting on c
+* c array is used to track which elements of x have been computed
+* singular condition variable in combination with c array to tell which processes can go
+* wait condition checking if bj is ready inside the second nested for loop
+* we need a mutex to pass in to condition variable function - what should the mutex be locking around?
+* signal after we set c[i] to 1
+*
+* need mutex to prevent two threads from grabbing the cv at the same time
+* define mutex and cv globally, outside of loop
+*
+* how to deal with each thread having its own b and c?
+* how to improve communication to computation ratio?
+* bj needs to only be read after it is written to, but bi needs to be read beforehand without being blocked by the cv
+*/
+
+
+int 
 main(int argc, char **argv) {
     struct timespec start, end;
     int i, j, p, n, *c;
@@ -65,6 +95,12 @@ main(int argc, char **argv) {
     }
     clock_gettime(CLOCK_MONOTONIC, &start);
     pthread_t *threads = malloc(p * sizeof(threads));
+    
+    //define locks and condition variables
+    pthread_mutex_t mutex;
+    pthread_cond_t c;
+
+    //initialize locks and condition variables
     for(i = 0; i < p; i++) {
         GM *arg = malloc(sizeof(*arg));
         arg->a = a;
