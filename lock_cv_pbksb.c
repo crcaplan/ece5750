@@ -3,14 +3,16 @@
 #include <time.h>
 #include <pthread.h>
 #define BILLION 1000000000L
-#define BLOCK_SIZE 2
+#define BLOCK_SIZE 1000
 
 typedef struct {
     double **a, *b;
     int *c, n, p, pid;
 } GM;
 
-
+//define locks and condition variables
+pthread_mutex_t mutex;
+pthread_cond_t cv;
 
 //n = size of array
 //p = number of processors/threads
@@ -48,12 +50,27 @@ pbksb(void *varg) {
         for(i = start; i >= end; i--) {
             sum = b[i];
             for(j = n - 1; j > i; j--){
-                while(c[j]==0);
+                //block here to see if bj is ready
+                pthread_mutex_lock(&mutex);
+                //printf("thread %d acquired lock at index %d\n", pid, j);
+                    while(c[j]!= 1){
+                        //printf("thread %d waiting on index %d, c is %d\n", pid, j, c[j]);
+                        pthread_cond_wait(&cv, &mutex);
+                        //printf("thread %d awake, c is %d\n", pid, c[j]);
+                    }
+                pthread_mutex_unlock(&mutex);
+                //printf("thread %d dropped lock\n", pid);
+
                 sum -= a[i][j] * b[j];
             }
             b[i] = sum / a[i][i];
+            pthread_mutex_lock(&mutex);
             c[i] = 1;
-    
+            pthread_mutex_unlock(&mutex);
+        
+            //signal here to wake up processes waiting on bj in loop above
+            pthread_cond_broadcast(&cv);
+            //printf("thread %d broadcasting after finishing index %d, c is %d\n", pid, i, c[j]);
             
         }
         //update start and end
@@ -107,6 +124,8 @@ main(int argc, char **argv) {
         c[i] = 0;
     }
 
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&cv, NULL);
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
