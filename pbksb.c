@@ -3,7 +3,7 @@
 #include <time.h>
 #include <pthread.h>
 #define BILLION 1000000000L
-#define BLOCK_SIZE 2
+#define BLOCK_SIZE 1
 
 typedef struct {
     double **a, *b;
