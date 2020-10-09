@@ -11,17 +11,6 @@ typedef struct {
 } GM;
 
 
-
-//n = size of array
-//p = number of processors/threads
-//a = U array from handout
-//b = b' vector from handout
-//pid = process id, ie what thread number
-//c = synchronization variable - update this to improve performance
-//a is double pointer because 2D array
-//start sets start of mem block, pid starts at 0
-//block is how many rows each thread operates on
-//j = n-1 is the last column
 void *
 pbksb(void *varg) {
     GM *arg = varg;
@@ -36,21 +25,25 @@ pbksb(void *varg) {
     p = arg->p;
     pid = arg->pid;
     
-    //set cyclic thread assignment by rows
+    //set start and end for cyclic thread assignment
     start = (n-1) - (BLOCK_SIZE * pid);
     end = start - BLOCK_SIZE + 1;
     
     while(start>=0){
         
+        //corner case for block sizes that don't divide evenly
+        //was used for testing different block sizes in preprocessor directive
         if(end<0)
             end = 0;
     
         for(i = start; i >= end; i--) {
             sum = b[i];
             for(j = n - 1; j > i; j--){
+                //busy waiting until b[j] is ready
                 while(c[j]==0);
                 sum -= a[i][j] * b[j];
             }
+            //calculate b[j] and update readiness vector
             b[i] = sum / a[i][i];
             c[i] = 1;
     
@@ -63,21 +56,6 @@ pbksb(void *varg) {
     return NULL;
 }
 
-/*mutex lock and cv
-* eliminate for loop at beginning w/ busy waiting on c
-* c array is used to track which elements of x have been computed
-* singular condition variable in combination with c array to tell which processes can go
-* wait condition checking if bj is ready inside the second nested for loop
-* we need a mutex to pass in to condition variable function - what should the mutex be locking around?
-* signal after we set c[i] to 1
-*
-* need mutex to prevent two threads from grabbing the cv at the same time
-* define mutex and cv globally, outside of loop
-*
-* how to deal with each thread having its own b and c?
-* how to improve communication to computation ratio?
-* bj needs to only be read after it is written to, but bi needs to be read beforehand without being blocked by the cv
-*/
 
 
 int 
@@ -132,9 +110,9 @@ main(int argc, char **argv) {
     time = time / BILLION;
     
     printf("Elapsed time: %lf seconds\n", time);
-    // for(i = 0; i < n; i++)
-    //     printf("%lf ", b[i]);
-    // printf("\n");
+    for(i = 0; i < n; i++)
+        printf("%lf ", b[i]);
+    printf("\n");
     return 0;
 }
 
