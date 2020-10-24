@@ -3,7 +3,6 @@
 #include <time.h>
 #include <pthread.h>
 #define BILLION 1000000000L
-#define BLOCK_SIZE 1
 
 typedef struct {
     double **a;
@@ -61,7 +60,9 @@ int
 main(int argc, char **argv) {
     struct timespec start, end;
     int i, j, p, n, *c;
-    double **a, *b, time, count = 1.0;
+    int **a, **b;
+    double time, count = 1.0;
+
     if(argc != 3) {
         printf("Usage: nqueens n p\nAborting...\n");
         exit(0);
@@ -88,20 +89,18 @@ main(int argc, char **argv) {
     clock_gettime(CLOCK_MONOTONIC, &start);
 
 
-    pthread_t *threads = malloc(p * sizeof(threads));
-    
-    for(i = 0; i < p; i++) {
+    pthread_t *threads = malloc(p * sizeof(threads))
+    for(i = 0; i < n; i++) {
         GM *arg = malloc(sizeof(*arg));
         arg->a = a;
         arg->b = b;
-        arg->c = c;
         arg->n = n;
         arg->p = p;
-        arg->pid = i;
-        pthread_create(&threads[i], NULL, pbksb, arg);
+        arg->pid = i % n;
+        pthread_create(&threads[i], NULL, pnqueens, arg);
     }
-    for(i = 0; i < p; i++)
-        pthread_join(threads[i], NULL);
+
+    for(i = 0; i < n; i++) pthread_join(threads[i], NULL);
     clock_gettime(CLOCK_MONOTONIC, &end);
     free(threads);
     

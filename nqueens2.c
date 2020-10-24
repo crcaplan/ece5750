@@ -4,31 +4,23 @@
 #include <string.h>
 #define BILLION 1000000000L
 
-int nqueens(int **a, int **b, int n, int profit, int col);
-void printBoard(int **a, int n);
-int isSafe(int **a, int n, int row, int col);
+int nqueens(int *a, int *b, int n, int profit, int col);
+void printBoard(int *a, int n);
+int isSafe(int *a, int n, int row, int col);
 
 int total_profit;
 int sols;
 
-int nqueens(int **a, int **b, int n, int profit, int col)
-{
+int nqueens(int *a, int *b, int n, int profit, int col) {
     /* base case: If all queens are placed
     then return true */
 
-    if (col == n)
-    {
+    if (col == n) {
         sols += 1;
 
         if (profit>total_profit){
-            
             total_profit = profit;
-            //memcpy(&b[0][0], &a[0][0], sizeof(a));
-            for(int i=0; i<n; i++){
-            	for (int j=0; j<n; j++) {
-            		b[i][j] = a[i][j];
-            	}
-            }
+            memcpy(b,a,n*sizeof(int));
             return 1;
         }
     }
@@ -37,14 +29,12 @@ int nqueens(int **a, int **b, int n, int profit, int col)
     this queen in all rows one by one */
     int res = 0;
     int temp = 0;
-    for (int i = 0; i < n; i++)
-    {
+    for (int i = 0; i < n; i++) {
         /* Check if queen can be placed on
         board[i][col] */
-        if ( isSafe(a, n, i, col) )
-        {
+        if ( isSafe(a, n, i, col) ) {
             /* Place this queen in board[i][col] */
-            a[i][col] = 1;
+            a[col] = i;
  
             // Make result true if any placement
             // is possible
@@ -53,7 +43,7 @@ int nqueens(int **a, int **b, int n, int profit, int col)
             /* If placing queen in board[i][col]
             doesn't lead to a solution, then
             remove queen from board[i][col] */
-            a[i][col] = 0; // BACKTRACK
+            a[col] = -1; // BACKTRACK
         }
     }
  
@@ -67,7 +57,7 @@ main(int argc, char **argv) {
     struct timespec start, end;
     double time;
     int n, i, j;
-    int **a, **b;
+    int *a, *b;
     
     if(argc != 2) {
         printf("Usage: bksb n\nAborting...\n");
@@ -78,21 +68,11 @@ main(int argc, char **argv) {
     sols = 0;
     total_profit = 0;
 
-    a = (int **) malloc(n * sizeof(int *));
-    for(i = 0; i < n; i++) {
-        a[i] = (int *) malloc(n * sizeof(int));
-        for(j = i; j < n; j++) {
-            a[i][j] = 0;
-        }
-    }
+    a = (int *) malloc(n * sizeof(int));
+    for(i = 0; i < n; i++) a[i] = -1;
 
-    b = (int **) malloc(n * sizeof(int *));
-    for(i = 0; i < n; i++) {
-        b[i] = (int *) malloc(n * sizeof(int));
-        for(j = i; j < n; j++) {
-            b[i][j] = 0;
-        }
-    }
+    b = (int *) malloc(n * sizeof(int));
+    for(i = 0; i < n; i++) b[i] = -1;
 
     
     //printBoard(b, n);
@@ -113,39 +93,25 @@ main(int argc, char **argv) {
     return 0;
 }
 
-void printBoard(int **a, int n)
-{
-    static int k = 1;
-    printf("%d-\n",k++);
-    for (int i = 0; i < n; i++)
-    {
-        for (int j = 0; j < n; j++)
-            printf(" %d ", a[i][j]);
-        printf("\n");
+void printBoard(int *a, int n) {
+	//a is a vector where i is the column of the NxN matrix and a[i] is the row where 
+	//a queen is placed
+    for (int j = 0; j < n; j++) {
+    	for (int i = 0; i < n; i++) {
+    		if (a[i] == j) printf("1 ");
+    		else printf("0 ");
+    	}
+    	printf("\n");
     }
     printf("\n");
 }
 
 
-int isSafe(int **a, int n, int row, int col)
-{
-    int i, j;
- 
-    /* Check this row on left side */
-    for (i = 0; i < col; i++)
-        if (a[row][i])
-            return 0;
- 
-    /* Check upper diagonal on left side */
-    for (i=row, j=col; i>=0 && j>=0; i--, j--)
-        if (a[i][j])
-            return 0;
- 
-    /* Check lower diagonal on left side */
-    for (i=row, j=col; j>=0 && i<n; i++, j--)
-        if (a[i][j])
-            return 0;
- 
-    return 1;
+int isSafe(int *a, int n, int row, int col) {
+	//need to check if we can set a[col] = row, based on current entries
+    if (a[col] != -1) return 0;
+    for (int i = 0; i < col; i++) {
+    	if (abs(row - a[i]) == col-i || a[i] == row) return 0;
+    }
+	return 1;
 }
-
