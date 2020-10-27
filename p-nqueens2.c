@@ -13,7 +13,7 @@ void printVec(int *avec, int n);
 
 
 typedef struct {
-    int *avec, *bvec;
+    int **a, **b;
     int *profitsi, *solsi;
     int pid, n, p;
 } GM;
@@ -24,15 +24,15 @@ void * pnqueens(void *varg) {
     int pid = arg->pid;
     int n = arg->n; 
     int p = arg->p;
-    int *avec = arg->avec; 
-    int *bvec = arg->bvec;
+    int **a = arg->a; 
+    int **b = arg->b;
     int *profitsi = arg->profitsi;
     int *solsi = arg->solsi;
-    nqueens(avec, bvec, n, avec[0], profitsi, solsi, 1);
+    nqueens(a, b, n, a[pid][0], profitsi, solsi, 1);
     return NULL;
 }
 
-int nqueens(int *avec, int *bvec, int n, int profit, int *profitsi, int *solsi, int col) {
+int nqueens(int **a, int **b, int n, int profit, int *profitsi, int *solsi, int col, int pid) {
     /* base case: If all queens are placed
     then return true */
 
@@ -41,7 +41,7 @@ int nqueens(int *avec, int *bvec, int n, int profit, int *profitsi, int *solsi, 
 
         if (profit > *profitsi) {
             *profitsi = profit;
-            memcpy(bvec,avec,n*sizeof(int));
+            memcpy(b,a,n*sizeof(int));
             return 1;
         }
     }
@@ -57,19 +57,22 @@ int nqueens(int *avec, int *bvec, int n, int profit, int *profitsi, int *solsi, 
         board[i][col] */
         //printVec(avec,n);
         //printf("%d \n",isSafe(avec,n,i,col));
-        if ( isSafe(avec, n, i, col) ) {
+        if ( isSafe(a[pid], n, i, col) ) {
             /* Place this queen in board[i][col] */
-            avec[col] = i;
+            a[pid][col] = i;
  
             // Make result true if any placement
             // is possible
-            res = nqueens(avec, bvec, n, profit + abs(i-col), profitsi, solsi, col + 1) || res;
+            if(subprob<p){
+                subprob += 1;
+            }
+            res = nqueens(a, b, n, profit + abs(i-col), profitsi, solsi, col + 1, pid) || res;
             //printVec(avec,n);
  
             /* If placing queen in board[i][col]
             doesn't lead to a solution, then
             remove queen from board[i][col] */
-            avec[col] = -1; // BACKTRACK
+            a[pid][col] = -1; // BACKTRACK
         }
     }
  
@@ -89,6 +92,7 @@ main(int argc, char **argv) {
     int *sols;
     int profit, sol, idxb; 
     double time;
+    int *subprobs;
 
     if(argc != 3) {
         printf("Usage: nqueens n p\nAborting...\n");
@@ -98,16 +102,16 @@ main(int argc, char **argv) {
     n = atoi(argv[1]);
     p = atoi(argv[2]);
     //maybe try using memset instead of for loops
-    a = (int **) malloc(n * sizeof(int *));
-    for(i = 0; i < n; i++) {
+    a = (int **) malloc(p * sizeof(int *));
+    for(i = 0; i < p; i++) {
         a[i] = (int *) malloc(n * sizeof(int));
         for(j = 0; j < n; j++) {
         	if (j == 0) a[i][j] = i;
             else a[i][j] = -1;
         }
     }
-    b = (int **) malloc(n * sizeof(int *));
-    for(i = 0; i < n; i++) {
+    b = (int **) malloc(p * sizeof(int *));
+    for(i = 0; i < p; i++) {
         b[i] = (int *) malloc(n * sizeof(int));
         for(j = 0; j < n; j++) {
             b[i][j] = 0;
@@ -115,15 +119,17 @@ main(int argc, char **argv) {
     }
     profits = (int *) malloc(p * sizeof(int));
     sols =    (int *) malloc(p * sizeof(int));
-    for (i = 0; i < n; i++) {
+    for (i = 0; i < p; i++) {
     	profits[i] = 0;
     	sols[i] = 0;
     }
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
+    *subprobs = n;
+
     pthread_t *threads = malloc(n * sizeof(threads));
-    
+
     for(i = 0; i < n; i++) {
         GM *arg = malloc(sizeof(*arg));
         arg->avec = &a[i][0];
@@ -133,8 +139,10 @@ main(int argc, char **argv) {
         arg->n = n;
         arg->p = p;
         arg->pid = i%n;
+        while(subprobs<i);
         pthread_create(&threads[i], NULL, pnqueens, arg);
     }
+    
 
     for(i = 0; i < n; i++) pthread_join(threads[i], NULL);
 
