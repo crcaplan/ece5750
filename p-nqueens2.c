@@ -61,12 +61,17 @@ int nqueens(int **a, int **b, int n, int profit, int *profitsi, int *solsi, int 
             /* Place this queen in board[i][col] */
             a[pid][col] = i;
  
-            // Make result true if any placement
-            // is possible
-            if(subprob<p){
+            // if we dont have enough subproblems yet, make new one
+            // check i < n-1 b/c we dont want to leave this proc with no work to do
+            if(subprob < p && i < n-1){
+            	//do a memcopy to assign current arr to the new processor
+            	// probably need a lock/cv here so only 1 processor can assign new subproblem
+            	// a[subprob] = a[pid];
+            	// profitsi[subprob] = profit + abs(i-col);
                 subprob += 1;
-            }
-            res = nqueens(a, b, n, profit + abs(i-col), profitsi, solsi, col + 1, pid) || res;
+            } else {
+            	res = nqueens(a, b, n, profit + abs(i-col), profitsi, solsi, col + 1, pid) || res;
+        	}
             //printVec(avec,n);
  
             /* If placing queen in board[i][col]
@@ -139,7 +144,7 @@ main(int argc, char **argv) {
         arg->n = n;
         arg->p = p;
         arg->pid = i%n;
-        while(subprobs<i);
+        while(subprobs < i);
         pthread_create(&threads[i], NULL, pnqueens, arg);
     }
     
