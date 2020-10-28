@@ -78,9 +78,8 @@ main(int argc, char **argv) {
     //printBoard(b, n);
     clock_gettime(CLOCK_MONOTONIC, &start);
     nqueens(a, b, n, 0, 0);
-    printf("%d \n", sols);
     printBoard(b, n);
-    printf("%d \n", total_profit);
+    printf("Found %d solutions, max profit = %d\n", sols, total_profit);
     clock_gettime(CLOCK_MONOTONIC, &end);
     
     time =
