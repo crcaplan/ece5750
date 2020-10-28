@@ -3,45 +3,57 @@
 #include <stdlib.h>
 #include <time.h>
 #include <pthread.h>
+#include <semaphore.h>
 #define BILLION 1000000000L
 
 int isSafe(int *a, int n, int row, int col);
 void * pnqueens(void *varg);
-int nqueens(int *avec, int *bvec, int n, int profit, int *profitsi, int *solsi, int col);
+int nqueens(int profit, int col, int pid);
 void printBoard(int *a, int n);
 void printVec(int *avec, int n);
 
 
-typedef struct {
-    int **a, **b;
-    int *profitsi, *solsi;
-    int pid, n, p;
-} GM;
+//condition variable global vars
+pthread_mutex_t mutex;
+pthread_cond_t cv;
+int** buffer;
+int idx;
+
+/**producer consumer global vars
+sem_t empty;
+sem_t full;
+int in = 0;
+int out = 0;
+GM** buffer;
+pthread_mutex_t mutex;
+**/
+
+int **a, **b;
+int *profits, *sols;
+int p;
+int n;
+
 
 
 void * pnqueens(void *varg) {
-    GM *arg = varg;
-    int pid = arg->pid;
-    int n = arg->n; 
-    int p = arg->p;
-    int **a = arg->a; 
-    int **b = arg->b;
-    int *profitsi = arg->profitsi;
-    int *solsi = arg->solsi;
-    nqueens(a, b, n, a[pid][0], profitsi, solsi, 1);
+    int *arg = varg;
+    int pid = *arg;
+    nqueens(profits[pid], 1, pid);
     return NULL;
 }
 
-int nqueens(int **a, int **b, int n, int profit, int *profitsi, int *solsi, int col, int pid) {
+int nqueens(int profit, int col, int pid) {
     /* base case: If all queens are placed
     then return true */
 
     if (col == n) {
-        *solsi = *solsi + 1;
+        sols[pid] = sols[pid] + 1;
 
-        if (profit > *profitsi) {
-            *profitsi = profit;
-            memcpy(b,a,n*sizeof(int));
+        if (profit > profits[pid]) {
+            profits[pid] = profit;
+            for(int i=0; i<n; i++){
+            	b[pid][i] = a[pid][i];
+            }
             return 1;
         }
     }
@@ -63,14 +75,23 @@ int nqueens(int **a, int **b, int n, int profit, int *profitsi, int *solsi, int 
  
             // if we dont have enough subproblems yet, make new one
             // check i < n-1 b/c we dont want to leave this proc with no work to do
-            if(subprob < p && i < n-1){
+            if(idx < p && i < n-1){
             	//do a memcopy to assign current arr to the new processor
             	// probably need a lock/cv here so only 1 processor can assign new subproblem
             	// a[subprob] = a[pid];
             	// profitsi[subprob] = profit + abs(i-col);
-                subprob += 1;
+
+                pthread_mutex_lock(&mutex);
+                buffer[idx] = (int*) malloc(sizeof(int));
+                idx++;
+                profits[idx] = profit + abs(i-col);
+                pthread_mutex_unlock(&mutex);
+            
+                //signal here to wake up processes waiting on bj in loop above
+                pthread_cond_broadcast(&cv);
+
             } else {
-            	res = nqueens(a, b, n, profit + abs(i-col), profitsi, solsi, col + 1, pid) || res;
+            	res = nqueens(profit + abs(i-col), col + 1, pid) || res;
         	}
             //printVec(avec,n);
  
@@ -91,13 +112,11 @@ int nqueens(int **a, int **b, int n, int profit, int *profitsi, int *solsi, int 
 int 
 main(int argc, char **argv) {
     struct timespec start, end;
-    int i, j, p, n;
-    int **a, **b;
-    int *profits;
-    int *sols;
+    int i, j;
     int profit, sol, idxb; 
     double time;
-    int *subprobs;
+    
+
 
     if(argc != 3) {
         printf("Usage: nqueens n p\nAborting...\n");
@@ -129,22 +148,35 @@ main(int argc, char **argv) {
     	sols[i] = 0;
     }
 
+    buffer = (int**) malloc(p * sizeof(int*));
+    for (i = 0; i<p; i++){
+        buffer[i] = (int *) malloc(sizeof(int));
+        *buffer[i] = -1;
+    }
+
+    //fix syntax here, how to get arg not to error??
+    buffer[0] = 0;
+
+    idx = 1;
+
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    *subprobs = n;
 
     pthread_t *threads = malloc(n * sizeof(threads));
 
-    for(i = 0; i < n; i++) {
-        GM *arg = malloc(sizeof(*arg));
-        arg->avec = &a[i][0];
-        arg->bvec = &b[i][0];
-        arg->profitsi = &profits[i];
-        arg->solsi = &sols[i];
-        arg->n = n;
-        arg->p = p;
-        arg->pid = i%n;
-        while(subprobs < i);
+    pthread_create(&threads[0], NULL, pnqueens, buffer[0]);
+
+    //consumer stuff happens here
+    for(i = 1; i < n; i++) {
+        
+        pthread_mutex_lock(&mutex);
+        while(*buffer[idx]== -1){
+            pthread_cond_wait(&cv, &mutex);
+        }
+        int* arg = buffer[idx];
+        pthread_mutex_unlock(&mutex);
+
+
         pthread_create(&threads[i], NULL, pnqueens, arg);
     }
     
@@ -202,3 +234,34 @@ int isSafe(int *avec, int n, int row, int col) {
 }
 
 
+
+//buffer should point to GM structs (which represent subproblems)
+
+/**
+void *producer(void *pno)
+{   
+    int item;
+    for(int i = 0; i < p; i++) {
+        item = rand(); // Produce an random item
+        sem_wait(&empty);
+        pthread_mutex_lock(&mutex);
+        buffer[in] = item;
+        printf("Producer %d: Insert Item %d at %d\n", *((int *)pno),buffer[in],in);
+        in = (in+1);
+        pthread_mutex_unlock(&mutex);
+        sem_post(&full);
+    }
+}
+void *consumer(void *cno)
+{   
+    for(int i = 0; i < p; i++) {
+        sem_wait(&full);
+        pthread_mutex_lock(&mutex);
+        int item = buffer[out];
+        printf("Consumer %d: Remove Item %d from %d\n",*((int *)cno),item, out);
+        out = (out+1);
+        pthread_mutex_unlock(&mutex);
+        sem_post(&empty);
+    }
+}
+**/
