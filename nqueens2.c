@@ -86,7 +86,7 @@ main(int argc, char **argv) {
     BILLION *(end.tv_sec - start.tv_sec) +(end.tv_nsec - start.tv_nsec);
     time = time / BILLION;
     
-    printf("Elapsed: %lf seconds\n", time);
+    printf("%lf\n", time);
     // free(a);
     // free(b);
     return 0;
